@@ -1,0 +1,63 @@
+[package]
+name = "pura_lingua_compiler4middle_ir"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = ["./lexer", "./proc_macro_utils", "./token", "ast", "parser"]
+
+[workspace.dependencies]
+pura_lingua = { git = "https://github.com/PuraLingua/pura_lingua.git", features = [
+	"binary",
+	"stdlib_header",
+] }
+thiserror = "2.0.18"
+derive_more = { version = "2.0.1", features = ["full"] }
+proc_macro_utils = { package = "pura_lingua_compiler4middle_ir_proc_macro_utils", path = "./proc_macro_utils" }
+fmt_with_src = { git = "https://github.com/ExPuritate/fmt_with_src.git" }
+
+bitfields = { git = "https://github.com/ExPuritate/bitfields-rs.git", features = [
+	"std",
+] }
+
+line-ending = { git = "https://github.com/ExPuritate/rust-line-ending.git" }
+
+either = "1.15"
+
+compiler_base = { package = "pura_lingua_compiler_base", git = "https://github.com/PuraLingua/pura_lingua_compiler_base.git" }
+service_export = { package = "pura_lingua_compiler_service_export", git = "https://github.com/PuraLingua/pura_lingua_compiler_service.git" }
+
+[workspace.dependencies.konst]
+version = "0.4"
+features = ["alloc", "rust_latest_stable", "const_panic_derive"]
+
+[dependencies]
+pura_lingua = { workspace = true }
+
+compiler_base = { workspace = true }
+
+derive_more = { workspace = true }
+
+line-ending = { workspace = true }
+
+either = { workspace = true }
+
+ast = { package = "pura_lingua_compiler4middle_ir_ast", path = "./ast" }
+parser = { package = "pura_lingua_compiler4middle_ir_parser", path = "./parser" }
+glob = "0.3.3"
+
+[lib]
+name = "Compiler_MiddleIR"
+crate-type = ["dylib", "rlib"]
+
+[[bin]]
+name = "PLICompiler-MiddleIR"
+path = "./src/bin/interactive_compiler.rs"
+
+[[bin]]
+name = "PLPrintCoreDef-MiddleIR"
+path = "./src/bin/print_core_definition.rs"
+
+
+[workspace.lints.clippy]
+"large_enum_variant" = { level = "allow" }

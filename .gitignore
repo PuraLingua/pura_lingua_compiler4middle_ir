@@ -1,0 +1,10 @@
+/target
+/.cargo
+/Cargo.lock
+/pl_target
+
+# It's auto generated
+/**/*.plb
+
+# IDEs
+/.vscode

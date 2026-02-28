@@ -1,0 +1,46 @@
+class[0 public] "Test::Test": [!]"System::Object"
+{
+	field[0 public] A: [!]"System::UInt64";
+
+	method[1 public override] "ToString"() -> [!]"System::String"
+	{
+		locals (
+			a: [Test]"Test::Test"
+			b: [!]"System::UInt64"
+			c: [!]"System::String"
+		)
+
+		Load this -> a;
+		LoadField a 0 -> b;
+		StaticCall [!]"System::UInt64" ToString(b) -> c;
+		ReturnVal c;
+	}
+
+	method[2 public] ".ctor"(
+		[] [!]"System::UInt64",
+	) -> [!]"System::Void"
+	{
+		locals (
+			arg0: [!]"System::UInt64"
+		)
+
+		LoadArg 0 -> arg0;
+		SetThisField arg0 -> 0;
+	}
+
+	method[3 public static] TestFn() -> [!]"System::String"
+	{
+		locals (
+			a: [Test]"Test::Test"
+			b: [!]"System::UInt64"
+			c: [!]"System::String"
+		)
+		Load 10u64 -> b;
+		NewObject [Test]"Test::Test" ".ctor"(b) -> a;
+		InstanceCall a ToString() -> c;
+		ReturnVal c;
+	}
+
+	method[4 public static] ".sctor"() -> [!]"System::Void"
+	{}
+}

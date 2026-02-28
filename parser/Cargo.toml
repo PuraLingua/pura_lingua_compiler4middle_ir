@@ -1,0 +1,22 @@
+[package]
+name = "pura_lingua_compiler4middle_ir_parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = { workspace = true }
+derive_more = { workspace = true }
+
+enumflags2 = { version = "0.7.11", features = ["std"] }
+
+compiler_base = { workspace = true }
+
+either = { workspace = true }
+
+ast = { package = "pura_lingua_compiler4middle_ir_ast", path = "../ast" }
+
+lexer = { package = "pura_lingua_compiler4middle_ir_lexer", path = "../lexer" }
+token = { package = "pura_lingua_compiler4middle_ir_token", path = "../token" }
+
+[lints]
+workspace = true

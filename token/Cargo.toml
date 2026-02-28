@@ -1,0 +1,16 @@
+[package]
+name = "pura_lingua_compiler4middle_ir_token"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+konst = { workspace = true }
+
+fmt_with_src = { workspace = true }
+
+compiler_base = { workspace = true }
+
+proc_macros = { package = "pura_lingua_compiler4middle_ir_token_proc_macros", path = "./proc_macros" }
+
+[lib]
+path = "./src/token.rs"

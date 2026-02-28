@@ -1,0 +1,16 @@
+[package]
+name = "pura_lingua_compiler4middle_ir_lexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+konst = { workspace = true }
+thiserror = { workspace = true }
+derive_more = { workspace = true }
+
+compiler_base = { workspace = true }
+
+token_info = { package = "pura_lingua_compiler4middle_ir_token", path = "../token" }
+
+[lib]
+path = "./lexer.rs"

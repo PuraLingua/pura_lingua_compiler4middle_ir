@@ -1,0 +1,28 @@
+// TestNormalF
+class[0 public] "TestNormalF::Test": [!]"System::Object"
+{
+	method[2 public static] F1() -> [!]"System::Void"
+	{
+		locals (
+			u64Data: [!]"System::UInt64"
+			strData: [!]"System::String"
+			exception: [!]"System::Exception"
+		)
+
+		Load 10u64 -> u64Data;
+		StaticCall [!]"System::UInt64" ToString(u64Data) -> strData;
+		NewObject [!]"System::Exception" 2(strData) -> exception;
+		Throw exception;
+		Load 5u64 -> u64Data; // it's unreachable
+	}
+	method[3 public static] F2() -> [!]"System::Void"
+	{
+		locals (
+			junk: [!]"System::Void"
+		)
+
+		StaticCall [TestNormalF]"TestNormalF::Test" F1() -> junk;
+	}
+	method[4 public static] ".sctor"() -> [!]"System::Void"
+	{}
+}

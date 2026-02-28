@@ -1,0 +1,17 @@
+[package]
+name = "pura_lingua_compiler4middle_ir_ast"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+compiler_base = { workspace = true }
+pura_lingua = { workspace = true }
+
+fmt_with_src = { workspace = true }
+
+either = { workspace = true }
+
+token = { package = "pura_lingua_compiler4middle_ir_token", path = "../token" }
+
+[lints]
+workspace = true
