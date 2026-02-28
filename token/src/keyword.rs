@@ -21,8 +21,6 @@ use crate::{TokenInfo, impl_token_info_alias};
 pub enum StatementKeyword {
     #[str_val("Load")]
     Load,
-    #[str_val("LoadTypeValueSize")]
-    LoadTypeValueSize,
     #[str_val("ReadPointerTo")]
     ReadPointerTo,
     #[str_val("WritePointer")]
@@ -43,14 +41,6 @@ pub enum StatementKeyword {
     #[str_val("NonPurusCall")]
     NonPurusCall,
 
-    #[str_val("LoadArg")]
-    LoadArg,
-
-    #[str_val("LoadStatic")]
-    LoadStatic,
-
-    #[str_val("LoadField")]
-    LoadField,
     #[str_val("SetThisField")]
     SetThisField,
     #[str_val("SetStaticField")]
@@ -160,6 +150,14 @@ pub enum Keyword {
     Success,
     #[str_val("failure")]
     Failure,
+
+    #[str_val("__arg")]
+    Load_Arg,
+    #[str_val("__field")]
+    Load_Field,
+
+    #[str_val("sizeof")]
+    Sizeof,
 
     #[str_val("locals")]
     Locals,

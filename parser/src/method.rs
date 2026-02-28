@@ -1,10 +1,11 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use ast::{
+    field::FieldRef,
     identifier::Identifier,
     method::{
-        CheckKind, JumpCondition, JumpTargetType, Literal, Method, MethodReference, Parameter,
-        Statement,
+        CheckKind, JumpCondition, JumpTargetType, LoadableContent, Method, MethodReference,
+        Parameter, Statement,
     },
 };
 use compiler_base::{
@@ -283,12 +284,12 @@ pub fn parse_statement(
             .map(|_| CheckKind::AllZero)
     }
 
-    fn parse_field_ref(cursor: &mut TokenCursor) -> Result<Either<u32, Identifier>, ParseError> {
+    fn parse_field_ref(cursor: &mut TokenCursor) -> Result<FieldRef, ParseError> {
         cursor
             .require_identifier()
             .ok()
-            .map(Either::Right)
-            .or_else(|| parse_from_u64(cursor, try_into).ok().map(Either::Left))
+            .map(FieldRef::Right)
+            .or_else(|| parse_from_u64(cursor, try_into).ok().map(FieldRef::Left))
             .ok_or_else(|| {
                 ParseError::ExpectLiterals(vec![
                     LiteralKindType::Int,
@@ -326,12 +327,20 @@ pub fn parse_statement(
         U::try_from(v).unwrap()
     }
 
-    fn literal(cursor: &mut TokenCursor, is_negative: Option<bool>) -> AnyResult<Literal> {
+    fn loadable_content(
+        cursor: &mut TokenCursor,
+        is_negative: Option<bool>,
+        ty_generics: &[Identifier],
+        method_generics: &[Identifier],
+    ) -> AnyResult<LoadableContent> {
         let tk = *cursor.consume().ok_or(ParseError::UnexpectEOF)?;
         match tk.kind {
-            TokenKind::SpecialChar(SpecialChar::Hyphen) => {
-                literal(cursor, Some(!is_negative.unwrap_or(false)))
-            }
+            TokenKind::SpecialChar(SpecialChar::Hyphen) => loadable_content(
+                cursor,
+                Some(!is_negative.unwrap_or(false)),
+                ty_generics,
+                method_generics,
+            ),
             TokenKind::Literal { kind, suffix_start } => match kind {
                 LiteralKind::Int {
                     base,
@@ -347,10 +356,22 @@ pub fn parse_statement(
                     };
                     let start = if radix == 10 { 0 } else { 2 };
                     match ty {
-                        "u8" => Ok(Literal::U8(u8::from_str_radix(&value_s[start..], radix)?)),
-                        "u16" => Ok(Literal::U16(u16::from_str_radix(&value_s[start..], radix)?)),
-                        "u32" => Ok(Literal::U32(u32::from_str_radix(&value_s[start..], radix)?)),
-                        "u64" => Ok(Literal::U64(u64::from_str_radix(&value_s[start..], radix)?)),
+                        "u8" => Ok(LoadableContent::U8(u8::from_str_radix(
+                            &value_s[start..],
+                            radix,
+                        )?)),
+                        "u16" => Ok(LoadableContent::U16(u16::from_str_radix(
+                            &value_s[start..],
+                            radix,
+                        )?)),
+                        "u32" => Ok(LoadableContent::U32(u32::from_str_radix(
+                            &value_s[start..],
+                            radix,
+                        )?)),
+                        "u64" => Ok(LoadableContent::U64(u64::from_str_radix(
+                            &value_s[start..],
+                            radix,
+                        )?)),
                         "usize" => {
                             if std::io::IsTerminal::is_terminal(&std::io::stderr()) {
                                 eprintln!(
@@ -358,35 +379,41 @@ pub fn parse_statement(
                                 );
                             }
                             match size_of::<usize>() {
-                                1 => Ok(Literal::U8(u8::from_str_radix(&value_s[start..], radix)?)),
-                                2 => {
-                                    Ok(Literal::U16(u16::from_str_radix(&value_s[start..], radix)?))
-                                }
-                                4 => {
-                                    Ok(Literal::U32(u32::from_str_radix(&value_s[start..], radix)?))
-                                }
-                                8 => {
-                                    Ok(Literal::U64(u64::from_str_radix(&value_s[start..], radix)?))
-                                }
+                                1 => Ok(LoadableContent::U8(u8::from_str_radix(
+                                    &value_s[start..],
+                                    radix,
+                                )?)),
+                                2 => Ok(LoadableContent::U16(u16::from_str_radix(
+                                    &value_s[start..],
+                                    radix,
+                                )?)),
+                                4 => Ok(LoadableContent::U32(u32::from_str_radix(
+                                    &value_s[start..],
+                                    radix,
+                                )?)),
+                                8 => Ok(LoadableContent::U64(u64::from_str_radix(
+                                    &value_s[start..],
+                                    radix,
+                                )?)),
                                 _ => unimplemented!(),
                             }
                         }
-                        "i8" => Ok(Literal::I8(if is_negative.is_some_and(|x| x) {
+                        "i8" => Ok(LoadableContent::I8(if is_negative.is_some_and(|x| x) {
                             -i8::from_str_radix(&value_s[start..], radix)?
                         } else {
                             i8::from_str_radix(&value_s[start..], radix)?
                         })),
-                        "i16" => Ok(Literal::I16(if is_negative.is_some_and(|x| x) {
+                        "i16" => Ok(LoadableContent::I16(if is_negative.is_some_and(|x| x) {
                             -i16::from_str_radix(&value_s[start..], radix)?
                         } else {
                             i16::from_str_radix(&value_s[start..], radix)?
                         })),
-                        "i32" => Ok(Literal::I32(if is_negative.is_some_and(|x| x) {
+                        "i32" => Ok(LoadableContent::I32(if is_negative.is_some_and(|x| x) {
                             -i32::from_str_radix(&value_s[start..], radix)?
                         } else {
                             i32::from_str_radix(&value_s[start..], radix)?
                         })),
-                        "i64" => Ok(Literal::I64(if is_negative.is_some_and(|x| x) {
+                        "i64" => Ok(LoadableContent::I64(if is_negative.is_some_and(|x| x) {
                             -i64::from_str_radix(&value_s[start..], radix)?
                         } else {
                             i64::from_str_radix(&value_s[start..], radix)?
@@ -398,22 +425,22 @@ pub fn parse_statement(
                                 );
                             }
                             match size_of::<isize>() {
-                                1 => Ok(Literal::I8(if is_negative.is_some_and(|x| x) {
+                                1 => Ok(LoadableContent::I8(if is_negative.is_some_and(|x| x) {
                                     -i8::from_str_radix(&value_s[start..], radix)?
                                 } else {
                                     i8::from_str_radix(&value_s[start..], radix)?
                                 })),
-                                2 => Ok(Literal::I16(if is_negative.is_some_and(|x| x) {
+                                2 => Ok(LoadableContent::I16(if is_negative.is_some_and(|x| x) {
                                     -i16::from_str_radix(&value_s[start..], radix)?
                                 } else {
                                     i16::from_str_radix(&value_s[start..], radix)?
                                 })),
-                                4 => Ok(Literal::I32(if is_negative.is_some_and(|x| x) {
+                                4 => Ok(LoadableContent::I32(if is_negative.is_some_and(|x| x) {
                                     -i32::from_str_radix(&value_s[start..], radix)?
                                 } else {
                                     i32::from_str_radix(&value_s[start..], radix)?
                                 })),
-                                8 => Ok(Literal::I64(if is_negative.is_some_and(|x| x) {
+                                8 => Ok(LoadableContent::I64(if is_negative.is_some_and(|x| x) {
                                     -i64::from_str_radix(&value_s[start..], radix)?
                                 } else {
                                     i64::from_str_radix(&value_s[start..], radix)?
@@ -437,7 +464,7 @@ pub fn parse_statement(
                         .chars()
                         .next()
                         .ok_or(ParseError::ExpectLiteral(LiteralKindType::Char).into())
-                        .map(Literal::Char)
+                        .map(LoadableContent::Char)
                 }
                 LiteralKind::Byte { terminated } => {
                     assert!(terminated);
@@ -448,15 +475,15 @@ pub fn parse_statement(
                         .first()
                         .copied()
                         .ok_or(ParseError::ExpectLiteral(LiteralKindType::Byte).into())
-                        .map(Literal::Byte)
+                        .map(LoadableContent::Byte)
                 }
                 LiteralKind::Str { terminated } => {
                     assert!(terminated);
                     assert!(is_negative.is_none());
                     let s = &cursor.tokens.src[tk.span][1..(suffix_start as usize - 1)];
                     match compiler_base::descape::UnescapeExt::to_unescaped(s)? {
-                        Cow::Borrowed(x) => Ok(Literal::String(x.to_owned())),
-                        Cow::Owned(x) => Ok(Literal::String(x)),
+                        Cow::Borrowed(x) => Ok(LoadableContent::String(x.to_owned())),
+                        Cow::Owned(x) => Ok(LoadableContent::String(x)),
                     }
                 }
                 LiteralKind::ByteStr { terminated } => {
@@ -464,15 +491,17 @@ pub fn parse_statement(
                     assert!(is_negative.is_none());
                     let s = &cursor.tokens.src[tk.span][1..(suffix_start as usize - 1)];
                     match compiler_base::descape::UnescapeExt::to_unescaped(s)? {
-                        Cow::Borrowed(x) => Ok(Literal::ByteString(x.as_bytes().to_owned())),
-                        Cow::Owned(x) => Ok(Literal::ByteString(x.into_bytes())),
+                        Cow::Borrowed(x) => {
+                            Ok(LoadableContent::ByteString(x.as_bytes().to_owned()))
+                        }
+                        Cow::Owned(x) => Ok(LoadableContent::ByteString(x.into_bytes())),
                     }
                 }
                 LiteralKind::RawStr { n_hashes } => {
                     assert!(is_negative.is_none());
                     let prefix_offset = 2 + n_hashes.unwrap_or(0) as usize;
                     let until = suffix_start as usize - 1 - n_hashes.unwrap_or(0) as usize;
-                    Ok(Literal::String(
+                    Ok(LoadableContent::String(
                         cursor.tokens.src[tk.span][prefix_offset..until].to_owned(),
                     ))
                 }
@@ -480,28 +509,58 @@ pub fn parse_statement(
                     assert!(is_negative.is_none());
                     let prefix_offset = 2 + n_hashes.unwrap_or(0) as usize;
                     let until = suffix_start as usize - 1 - n_hashes.unwrap_or(0) as usize;
-                    Ok(Literal::ByteString(
+                    Ok(LoadableContent::ByteString(
                         cursor.tokens.src[tk.span].as_bytes()[prefix_offset..until].to_owned(),
                     ))
                 }
             },
             TokenKind::Keyword(Keyword::True) => {
                 if is_negative.is_some_and(|x| x) {
-                    Ok(Literal::False)
+                    Ok(LoadableContent::False)
                 } else {
-                    Ok(Literal::True)
+                    Ok(LoadableContent::True)
                 }
             }
             TokenKind::Keyword(Keyword::False) => {
                 if is_negative.is_some_and(|x| x) {
-                    Ok(Literal::True)
+                    Ok(LoadableContent::True)
                 } else {
-                    Ok(Literal::False)
+                    Ok(LoadableContent::False)
                 }
             }
             TokenKind::Keyword(Keyword::This) => {
                 assert!(is_negative.is_none());
-                Ok(Literal::This)
+                Ok(LoadableContent::This)
+            }
+            TokenKind::Keyword(Keyword::Load_Arg) => {
+                assert!(is_negative.is_none());
+                cursor.require_special_char(SpecialChar::ParenthesisOpen)?;
+                let id = parse_from_u64(cursor, noop)?;
+                cursor.require_special_char(SpecialChar::ParenthesisClose)?;
+                Ok(LoadableContent::Arg(id))
+            }
+            TokenKind::Keyword(Keyword::Static) => {
+                assert!(is_negative.is_none());
+                cursor.require_special_char(SpecialChar::ParenthesisOpen)?;
+                let ty = crate::ty::type_reference(cursor, ty_generics, method_generics)?;
+                let field = parse_field_ref(cursor)?;
+                cursor.require_special_char(SpecialChar::ParenthesisClose)?;
+                Ok(LoadableContent::Static { ty, field })
+            }
+            TokenKind::Keyword(Keyword::Load_Field) => {
+                assert!(is_negative.is_none());
+                cursor.require_special_char(SpecialChar::ParenthesisOpen)?;
+                let container = cursor.require_identifier()?;
+                let field = parse_field_ref(cursor)?;
+                cursor.require_special_char(SpecialChar::ParenthesisClose)?;
+                Ok(LoadableContent::Field { container, field })
+            }
+            TokenKind::Keyword(Keyword::Sizeof) => {
+                assert!(is_negative.is_none());
+                cursor.require_special_char(SpecialChar::ParenthesisOpen)?;
+                let ty = crate::ty::type_reference(cursor, ty_generics, method_generics)?;
+                cursor.require_special_char(SpecialChar::ParenthesisClose)?;
+                Ok(LoadableContent::Size(ty))
             }
             _ => {
                 cursor.index -= 1;
@@ -527,18 +586,14 @@ pub fn parse_statement(
     let statement_tk = cursor.consume_statement_keyword()?;
     match statement_tk.kind.unwrap_statement_keyword() {
         token::keyword::StatementKeyword::Load => {
-            let literal = literal(cursor, None)?;
+            let literal = loadable_content(cursor, None, ty_generics, method_generics)?;
             cursor.require_special_char(SpecialChar::ThinArrow)?;
             let var = cursor.require_identifier()?;
             cursor.require_special_char(SpecialChar::Semicolon)?;
-            Ok(Statement::Load { literal, var })
-        }
-        token::keyword::StatementKeyword::LoadTypeValueSize => {
-            let ty = crate::ty::type_reference(cursor, ty_generics, method_generics)?;
-            cursor.require_special_char(SpecialChar::ThinArrow)?;
-            let var = cursor.require_identifier()?;
-            cursor.require_special_char(SpecialChar::Semicolon)?;
-            Ok(Statement::LoadTypeValueSize { ty, var })
+            Ok(Statement::Load {
+                content: literal,
+                var,
+            })
         }
         token::keyword::StatementKeyword::ReadPointerTo => {
             let ptr = cursor.require_identifier()?;
@@ -655,33 +710,7 @@ pub fn parse_statement(
                 result,
             })
         }
-        token::keyword::StatementKeyword::LoadArg => {
-            let arg = parse_from_u64(cursor, noop)?;
-            cursor.require_special_char(SpecialChar::ThinArrow)?;
-            let local = cursor.require_identifier()?;
-            cursor.require_special_char(SpecialChar::Semicolon)?;
-            Ok(Statement::LoadArg { arg, local })
-        }
-        token::keyword::StatementKeyword::LoadStatic => {
-            let ty = crate::ty::type_reference(cursor, ty_generics, method_generics)?;
-            let field = parse_field_ref(cursor)?;
-            cursor.require_special_char(SpecialChar::ThinArrow)?;
-            let local = cursor.require_identifier()?;
-            cursor.require_special_char(SpecialChar::Semicolon)?;
-            Ok(Statement::LoadStatic { ty, field, local })
-        }
-        token::keyword::StatementKeyword::LoadField => {
-            let container = cursor.require_identifier()?;
-            let field = parse_field_ref(cursor)?;
-            cursor.require_special_char(SpecialChar::ThinArrow)?;
-            let local = cursor.require_identifier()?;
-            cursor.require_special_char(SpecialChar::Semicolon)?;
-            Ok(Statement::LoadField {
-                container,
-                field,
-                local,
-            })
-        }
+
         token::keyword::StatementKeyword::SetThisField => {
             let val = cursor.require_identifier()?;
             cursor.require_special_char(SpecialChar::ThinArrow)?;

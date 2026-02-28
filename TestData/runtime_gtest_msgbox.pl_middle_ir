@@ -40,7 +40,7 @@ class[0 public] "MsgboxTest::Test": [!]"System::Object"
 			RET: [!]"System::Int32"
 		)
 
-		LoadStatic [MsgboxTest]"MsgboxTest::Test" 0 -> lib;
+		Load static([MsgboxTest]"MsgboxTest::Test" 0) -> lib;
 		Load "MessageBoxW" -> methodName;
 		InstanceCall lib GetSymbol(methodName) -> fnPtr;
 

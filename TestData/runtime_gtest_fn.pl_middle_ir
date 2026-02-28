@@ -11,7 +11,7 @@ class[0 public] "Test::Test": [!]"System::Object"
 		)
 
 		Load this -> a;
-		LoadField a 0 -> b;
+		Load __field(a 0) -> b;
 		StaticCall [!]"System::UInt64" ToString(b) -> c;
 		ReturnVal c;
 	}
@@ -24,7 +24,7 @@ class[0 public] "Test::Test": [!]"System::Object"
 			arg0: [!]"System::UInt64"
 		)
 
-		LoadArg 0 -> arg0;
+		Load __arg(0) -> arg0;
 		SetThisField arg0 -> 0;
 	}
 

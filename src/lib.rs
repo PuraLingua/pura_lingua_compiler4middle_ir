@@ -313,10 +313,17 @@ impl CompileContext {
                 this: &'a CompileContext,
                 method: &Method,
             ) -> Option<&'a TypeDef> {
+                resolve_variable_type_by_addr(map_variable(var, &method.locals).ok()?, this, method)
+            }
+            fn resolve_variable_type_by_addr<'a>(
+                addr: RegisterAddr,
+                this: &'a CompileContext,
+                method: &Method,
+            ) -> Option<&'a TypeDef> {
                 let r = method
                     .attr
                     .local_variable_types()
-                    .get(map_variable(var, &method.locals).ok()?.get_usize())?;
+                    .get(addr.get_usize())?;
                 this.resolve_type_reference(r)
             }
             Ok(binary::ty::Method {
@@ -343,7 +350,7 @@ impl CompileContext {
                     .iter()
                     .map(|x| -> compiler_base::AnyResult<Instruction<_, _, _, _>> {
                         match x {
-                            ast::method::Statement::Load { literal, var } => {
+                            ast::method::Statement::Load { content: literal, var } => {
                                 let register_addr = RegisterAddr::new(
                                     method
                                         .locals
@@ -353,54 +360,86 @@ impl CompileContext {
                                         as u64,
                                 );
                                 match literal {
-                                    &ast::method::Literal::U8(val) => {
+                                    &ast::method::LoadableContent::U8(val) => {
                                         Ok(Instruction::Load_u8 { register_addr, val })
                                     }
-                                    &ast::method::Literal::U16(val) => {
+                                    &ast::method::LoadableContent::U16(val) => {
                                         Ok(Instruction::Load_u16 { register_addr, val })
                                     }
-                                    &ast::method::Literal::U32(val) => {
+                                    &ast::method::LoadableContent::U32(val) => {
                                         Ok(Instruction::Load_u32 { register_addr, val })
                                     }
-                                    &ast::method::Literal::U64(val) => {
+                                    &ast::method::LoadableContent::U64(val) => {
                                         Ok(Instruction::Load_u64 { register_addr, val })
                                     }
-                                    &ast::method::Literal::I8(val) => {
+                                    &ast::method::LoadableContent::I8(val) => {
                                         Ok(Instruction::Load_i8 { register_addr, val })
                                     }
-                                    &ast::method::Literal::I16(val) => {
+                                    &ast::method::LoadableContent::I16(val) => {
                                         Ok(Instruction::Load_i16 { register_addr, val })
                                     }
-                                    &ast::method::Literal::I32(val) => {
+                                    &ast::method::LoadableContent::I32(val) => {
                                         Ok(Instruction::Load_i32 { register_addr, val })
                                     }
-                                    &ast::method::Literal::I64(val) => {
+                                    &ast::method::LoadableContent::I64(val) => {
                                         Ok(Instruction::Load_i64 { register_addr, val })
                                     }
-                                    ast::method::Literal::String(val) => {
+                                    ast::method::LoadableContent::String(val) => {
                                         Ok(Instruction::Load_String {
                                             register_addr,
                                             val: assembly.add_string(val),
                                         })
                                     }
-                                    ast::method::Literal::Char(_val) => todo!(),
-                                    ast::method::Literal::ByteString(_val) => todo!(),
-                                    ast::method::Literal::Byte(_val) => todo!(),
-                                    ast::method::Literal::True => {
+                                    ast::method::LoadableContent::Char(_val) => todo!(),
+                                    ast::method::LoadableContent::ByteString(_val) => todo!(),
+                                    ast::method::LoadableContent::Byte(_val) => todo!(),
+                                    ast::method::LoadableContent::True => {
                                         Ok(Instruction::LoadTrue { register_addr })
                                     }
-                                    ast::method::Literal::False => {
+                                    ast::method::LoadableContent::False => {
                                         Ok(Instruction::LoadFalse { register_addr })
                                     }
-                                    ast::method::Literal::This => {
+                                    ast::method::LoadableContent::This => {
                                         Ok(Instruction::LoadThis { register_addr })
                                     }
+                                    &ast::method::LoadableContent::Arg(arg) => {
+                                        Ok(Instruction::LoadArg { register_addr, arg })
+                                    }
+                                    ast::method::LoadableContent::Static {
+                                        ty,
+                                        field,
+                                    } => {
+                                        let ty_token = map_type_reference(this, assembly, current_file, ty)?;
+                                        let field = map_field_reference(
+                                            this,
+                                            assembly,
+                                            current_file, 
+                                            this.resolve_type_reference(ty),
+                                            true,
+                                            field,
+                                        )?;
+                                        Ok(Instruction::LoadStatic { register_addr, ty: ty_token, field })
+                                    }
+                                    ast::method::LoadableContent::Field {
+                                        container,
+                                        field,
+                                    } => {
+                                        let container = map_variable(container, &method.locals)?;
+                                        let field = map_field_reference(
+                                            this,
+                                            assembly,
+                                            current_file,
+                                            resolve_variable_type_by_addr(container, this, method),
+                                            false,
+                                            field,
+                                        )?;
+                                        Ok(Instruction::LoadField { container, field, register_addr })
+                                    }
+                                    ast::method::LoadableContent::Size(ty) => {
+                                        let ty = map_type_reference(this, assembly, current_file, ty)?;
+                                        Ok(Instruction::LoadTypeValueSize { register_addr, ty })
+                                    }
                                 }
-                            }
-                            ast::method::Statement::LoadTypeValueSize { ty, var } => {
-                                let register_addr = map_variable(var, &method.locals)?;
-                                let ty = map_type_reference(this, assembly, current_file, ty)?;
-                                Ok(Instruction::LoadTypeValueSize { register_addr, ty })
                             }
                             ast::method::Statement::ReadPointerTo {
                                 ptr,
@@ -560,52 +599,7 @@ impl CompileContext {
                                     ret_at,
                                 })
                             }
-                            ast::method::Statement::LoadArg { arg, local } => {
-                                let register_addr = map_variable(local, &method.locals)?;
-                                Ok(Instruction::LoadArg {
-                                    register_addr,
-                                    arg: *arg,
-                                })
-                            }
-                            ast::method::Statement::LoadStatic { ty, field, local } => {
-                                let register_addr = map_variable(local, &method.locals)?;
-                                let ty_token =
-                                    map_type_reference(this, assembly, current_file, ty)?;
-                                let field = map_field_reference(
-                                    this,
-                                    assembly,
-                                    current_file,
-                                    this.resolve_type_reference(ty),
-                                    true,
-                                    field,
-                                )?;
-                                Ok(Instruction::LoadStatic {
-                                    register_addr,
-                                    ty: ty_token,
-                                    field,
-                                })
-                            }
-                            ast::method::Statement::LoadField {
-                                container,
-                                field,
-                                local,
-                            } => {
-                                let container_addr = map_variable(container, &method.locals)?;
-                                let field = map_field_reference(
-                                    this,
-                                    assembly,
-                                    current_file,
-                                    resolve_variable_type(container, this, method),
-                                    false,
-                                    field,
-                                )?;
-                                let register_addr = map_variable(local, &method.locals)?;
-                                Ok(Instruction::LoadField {
-                                    container: container_addr,
-                                    field,
-                                    register_addr,
-                                })
-                            }
+                            
                             ast::method::Statement::SetThisField { val, field } => {
                                 let val_addr = map_variable(val, &method.locals)?;
                                 let field = map_field_reference(

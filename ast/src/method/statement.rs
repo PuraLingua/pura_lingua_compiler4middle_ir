@@ -1,7 +1,7 @@
 use compiler_base::abstract_info::type_reference::TypeReference;
 use either::Either;
 
-use crate::{identifier::Identifier, method::MethodReference};
+use crate::{field::FieldRef, identifier::Identifier, method::MethodReference};
 
 #[derive(Clone, Debug)]
 pub enum Statement {
@@ -9,11 +9,7 @@ pub enum Statement {
     ///
     /// [`Instruction`]: pura_lingua::global::instruction::Instruction
     Load {
-        literal: Literal,
-        var: Identifier,
-    },
-    LoadTypeValueSize {
-        ty: TypeReference,
+        content: LoadableContent,
         var: Identifier,
     },
     ReadPointerTo {
@@ -67,32 +63,15 @@ pub enum Statement {
         result: Identifier,
     },
 
-    LoadArg {
-        arg: u64,
-        local: Identifier,
-    },
-
-    LoadStatic {
-        ty: TypeReference,
-        field: Either<u32, Identifier>,
-        local: Identifier,
-    },
-
-    LoadField {
-        container: Identifier,
-        field: Either<u32, Identifier>,
-        local: Identifier,
-    },
-
     SetThisField {
         val: Identifier,
-        field: Either<u32, Identifier>,
+        field: FieldRef,
     },
 
     SetStaticField {
         val: Identifier,
         ty: TypeReference,
-        field: Either<u32, Identifier>,
+        field: FieldRef,
     },
 
     Throw {
@@ -139,7 +118,7 @@ pub enum CheckKind {
 // }
 
 #[derive(Clone, Debug)]
-pub enum Literal {
+pub enum LoadableContent {
     U8(u8),
     U16(u16),
     U32(u32),
@@ -155,4 +134,14 @@ pub enum Literal {
     True,
     False,
     This,
+    Arg(u64),
+    Static {
+        ty: TypeReference,
+        field: FieldRef,
+    },
+    Field {
+        container: Identifier,
+        field: FieldRef,
+    },
+    Size(TypeReference),
 }

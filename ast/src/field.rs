@@ -1,4 +1,5 @@
 use compiler_base::{abstract_info::type_reference::TypeReference, global::attrs::FieldAttr};
+use either::Either;
 
 use crate::identifier::Identifier;
 
@@ -9,3 +10,5 @@ pub struct Field {
     pub name: Identifier,
     pub ty: TypeReference,
 }
+
+pub type FieldRef = Either<u32, Identifier>;

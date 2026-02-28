@@ -34,6 +34,34 @@ class[0 public] "Test::Test": [!]"System::Object"
 }
 
 #[test]
+fn runtime_test_normal_f() -> pura_lingua::global::Result<()> {
+    let mut ctx = CompileContext::new();
+    ctx.add_core()?;
+
+    ctx.add_file(
+        "./TestData/runtime_test_normal_f.pl_middle_ir",
+        "TestNormalF".to_owned(),
+        false,
+    )?;
+
+    let compiled = ctx.compile()?;
+
+    let mut answer = String::new();
+    std::io::stdout().write_all("Should emit to file[Y/N]:".as_bytes())?;
+    std::io::stdout().flush()?;
+    std::io::stdin().read_line(&mut answer)?;
+    answer.make_ascii_lowercase();
+    if answer.contains("y") {
+        for (name, content) in compiled {
+            let mut file = std::fs::File::create(format!("./TestData/{name}.plb"))?;
+            content.write_to(&mut file)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
 fn runtime_gtest_fn() -> pura_lingua::global::Result<()> {
     let mut ctx = CompileContext::new();
     ctx.add_core()?;
